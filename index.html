@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>Comment Picker for Giveaways</title>
+
+<!-- PWA Meta Tags -->
+<meta name="application-name" content="GiveawayPicker"/>
+<meta name="description" content="Pick random winners from Instagram post comments instantly"/>
+<meta name="theme-color" content="#c850c0"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="GiveawayPicker"/>
+<meta name="msapplication-TileColor" content="#c850c0"/>
+<meta name="msapplication-tap-highlight" content="no"/>
+
+<!-- Open Graph -->
+<meta property="og:type" content="website"/>
+<meta property="og:title" content="Comment Picker for Giveaways"/>
+<meta property="og:description" content="Pick random winners from Instagram post comments"/>
+<meta property="og:image" content="./icons/icon-512.png"/>
+
+<!-- Icons -->
+<link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png"/>
+<link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png"/>
+<link rel="apple-touch-icon" href="./icons/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192.png"/>
+<link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512.png"/>
+
+<!-- Manifest -->
+<link rel="manifest" href="./manifest.json"/>
+
+<!-- Font -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
+
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden}
+body{
+  font-family:'Nunito',sans-serif;
+  background:#111;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+}
+#app{
+  position:relative;
+  width:100%;
+  max-width:430px;
+  height:100dvh;
+  overflow:hidden;
+  margin:0 auto;
+  
+}
+@supports not (height:100dvh){#app{height:100vh}}
+.bg-white{background:#ffffff}
+
+.bg-grad{background:linear-gradient(160deg,#c850c0 0%,#c850c0 20%,#ff6b6b 60%,#ffd166 80%,#06d6a0 100%)}
+
+.screen{display:none;width:100%;height:100%;position:absolute;top:0;left:0;flex-direction:column;}
+.screen.active{display:flex}
+
+@keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+@keyframes confettiFall{0%{transform:translateY(0) rotate(0deg);opacity:1}100%{transform:translateY(120vh) rotate(720deg);opacity:0}}
+@keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+.pop-anim{animation:pop .5s cubic-bezier(.34,1.56,.64,1) forwards}
+
+/* ── Toggle ── */
+.toggle{position:relative;display:inline-block;width:50px;height:28px;flex-shrink:0}
+.toggle input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;background:#ccc;border-radius:34px;cursor:pointer;transition:.3s}
+.slider::before{content:'';position:absolute;height:20px;width:20px;left:4px;bottom:4px;background:white;border-radius:50%;transition:.3s}
+input:checked+.slider{background:#2ec47c}
+input:checked+.slider::before{transform:translateX(22px)}
+
+/* ── Buttons ── */
+.icon-btn{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;border:none}
+.tab-pill{display:flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:24px;background:rgba(255,255,255,.18);cursor:pointer;border:none}
+.tab-pill.active{background:white}
+
+.btn-red{background:#f03060;color:white;font-weight:800;font-size:clamp(13px,3.5vw,15px);letter-spacing:.06em;border:none;border-radius:16px;padding:16px;width:100%;cursor:pointer;transition:transform .12s,box-shadow .12s;box-shadow:0 8px 24px rgba(240,48,96,.4);font-family:inherit}
+.btn-red:active{transform:scale(.97)}
+.btn-red:disabled{background:rgba(255,255,255,.25);box-shadow:none;color:rgba(255,255,255,.6);cursor:not-allowed}
+
+.btn-outline{background:white;color:#1a1a2e;font-weight:800;font-size:clamp(13px,3.5vw,15px);letter-spacing:.06em;border:none;border-radius:16px;padding:16px;width:100%;cursor:pointer;transition:transform .12s;font-family:inherit}
+.btn-outline:active{transform:scale(.97)}
+.btn-outline:disabled{background:rgba(255,255,255,.25);color:rgba(255,255,255,.5);cursor:not-allowed}
+
+/* ── Progress ring ── */
+.progress-ring{transform:rotate(-90deg)}
+.progress-ring circle{transition:stroke-dashoffset .4s linear}
+
+/* ── Cards ── */
+.winner-card{background:white;border-radius:24px;padding:clamp(20px,5vw,32px) clamp(16px,4vw,24px);display:flex;flex-direction:column;align-items:center;gap:10px;justify-content:center;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.confetti-piece{position:absolute;border-radius:2px;animation:confettiFall 1.2s ease-out forwards}
+
+/* ── Adjust btns ── */
+.adj-minus{width:40px;height:40px;border-radius:50%;background:#f3f4f6;color:#9ca3af;font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-family:inherit;flex-shrink:0}
+.adj-plus{width:40px;height:40px;border-radius:50%;background:#fce7f3;color:#ec4899;font-size:20px;font-weight:900;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-family:inherit;flex-shrink:0}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+/* ── Install Banner ── */
+#install-banner{
+  position:fixed;bottom:0;left:50%;transform:translateX(-50%);
+  width:100%;max-width:430px;
+  background:white;border-radius:20px 20px 0 0;
+  padding:20px 20px max(env(safe-area-inset-bottom,0px),20px);
+  box-shadow:0 -8px 32px rgba(0,0,0,.18);
+  z-index:9999;display:none;
+  animation:slideUp .35s ease;
+}
+#install-banner.show{display:block}
+
+/* ── Offline Toast ── */
+#offline-toast{
+  position:fixed;top:max(env(safe-area-inset-top,0px),16px);left:50%;transform:translateX(-50%);
+  background:#1a1a2e;color:white;font-weight:700;font-size:13px;
+  padding:10px 20px;border-radius:999px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  z-index:10000;display:none;
+  animation:fadeIn .3s ease;
+  white-space:nowrap;
+}
+#offline-toast.show{display:block}
+
+/* ── Update Toast ── */
+#update-toast{
+  position:fixed;top:max(env(safe-area-inset-top,0px),16px);left:50%;transform:translateX(-50%);
+  background:#2ec47c;color:white;font-weight:700;font-size:13px;
+  padding:10px 20px;border-radius:999px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);
+  z-index:10000;display:none;cursor:pointer;
+  animation:fadeIn .3s ease;
+  white-space:nowrap;
+}
+#update-toast.show{display:block}
+
+/* ── Splash screen ── */
+#splash{
+  position:fixed;inset:0;z-index:99999;
+  background:linear-gradient(160deg,#c850c0 0%,#c850c0 20%,#ff6b6b 60%,#ffd166 80%,#06d6a0 100%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+  transition:opacity .4s ease;
+}
+#splash.hide{opacity:0;pointer-events:none}
+#splash img{width:80px;height:80px;border-radius:20px;box-shadow:0 12px 32px rgba(0,0,0,.25)}
+#splash p{color:white;font-weight:900;font-size:20px;letter-spacing:.05em}
+#splash small{color:rgba(255,255,255,.7);font-size:12px;font-weight:600;animation:pulse 1.2s infinite}
+</style>
+</head>
+<script>
+function startLoading() {
+    const splash = document.getElementById('splash');
+    
+    // Show splash
+    splash.classList.remove('hide');
+    
+    // Simulate loading time then go to next screen
+    setTimeout(() => {
+        goTo('screen-preview');
+        
+        // Hide splash after navigation
+        setTimeout(() => {
+            splash.classList.add('hide');
+        }, 400);
+    }, 1600); // Loading duration - feel free to adjust
+}
+</script>
+<body>
+
+<!-- Splash Screen -->
+ 
+<!-- <div id="splash">
+  <img src="./icons/icon-192.png" alt="App Icon"/>
+  <p>GiveawayPicker</p>
+  <small>Loading...</small>
+</div> -->
+<div id="splash" class="hide">
+  <img src="./icons/icon-192.png" alt="App Icon"/>
+  <p>GiveawayPicker</p>
+  <small>Loading...</small>
+</div>
+
+<!-- Offline Toast -->
+<div id="offline-toast">📵 You're offline — app still works!</div>
+
+<!-- Update Toast -->
+<div id="update-toast" onclick="location.reload()">🔄 Update available — tap to refresh</div>
+
+<!-- Install Banner -->
+<div id="install-banner">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+    <img src="./icons/icon-192.png" style="width:48px;height:48px;border-radius:12px" alt="icon"/>
+    <div>
+      <p style="font-weight:800;color:#111;font-size:15px">Add to Home Screen</p>
+      <p style="font-size:12px;color:#6b7280;font-weight:600">Install the app for quick access</p>
+    </div>
+    <button onclick="closeBanner()" style="margin-left:auto;background:none;border:none;font-size:20px;color:#9ca3af;cursor:pointer;padding:4px">✕</button>
+  </div>
+  <div style="display:flex;gap:10px">
+    <button onclick="closeBanner()" style="flex:1;padding:14px;border-radius:14px;border:1.5px solid #e5e7eb;background:white;font-weight:800;font-size:14px;color:#6b7280;cursor:pointer;font-family:inherit">Not now</button>
+    <button id="install-btn" style="flex:2;padding:14px;border-radius:14px;border:none;background:#f03060;color:white;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 6px 20px rgba(240,48,96,.4)">📲 Install App</button>
+  </div>
+</div>
+
+<!-- ════════════════ APP ════════════════ -->
+<div id="app">
+
+<!-- SCREEN 1 — Paste Link -->
+<div class="screen active bg-grad" id="screen-paste">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:max(env(safe-area-inset-top,0px),40px) 20px 16px">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <button class="icon-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="2,4 12,13 22,4"/></svg>
+      </button>
+      <span style="color:white;font-size:11px;font-weight:700">Help</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.2);border-radius:999px;padding:8px 12px">
+      <button class="tab-pill active">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#c850c0" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#c850c0"/></svg>
+      </button>
+      <button class="tab-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px">
+      <button class="icon-btn" style="background:rgba(250,204,21,.8)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+      </button>
+      <span style="color:white;font-size:11px;font-weight:700;text-align:center">1<br/>Coin</span>
+    </div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:0 24px;gap:24px">
+    <p style="color:white;font-weight:900;font-size:clamp(14px,3.8vw,18px);letter-spacing:.15em;line-height:1.4">PASTE YOUR INSTAGRAM POST LINK</p>
+    <div style="background:white;border-radius:16px;display:flex;align-items:center;padding:14px 16px;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.15)">
+      <input id="link-input" type="url" inputmode="url" placeholder="https://www.instagram.com/p/..."
+        style="flex:1;outline:none;font-size:13px;font-weight:600;color:#6b7280;background:transparent;border:none;font-family:inherit;min-width:0"
+        value="https://www.instagram.com/p/Xdr4..."/>
+      <button onclick="document.getElementById('link-input').value=''" style="color:#ec4899;font-weight:800;font-size:13px;background:none;border:none;cursor:pointer;white-space:nowrap;font-family:inherit;padding:0">Paste</button>
+    </div>
+    <!-- <button class="btn-red" onclick="goTo('screen-preview')">NEXT STEP</button> -->
+  <button class="btn-red" onclick="startLoading()">NEXT STEP</button>
+
+    <!-- Install shortcut inside app -->
+    <button id="mini-install-btn" onclick="showBanner()" style="display:none;background:rgba(255,255,255,.15);color:white;border:1.5px solid rgba(255,255,255,.35);border-radius:14px;padding:12px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer;letter-spacing:.04em">
+      📲 Add to Home Screen
+    </button>
+  </div>
+</div>
+
+<!-- SCREEN 2 — Preview / Settings -->
+<div class="screen bg-white" id="screen-preview">
+  <div style="padding:max(env(safe-area-inset-top,0px),40px) 20px 16px;display:flex;align-items:center;gap:12px;border-bottom:.5px solid #f3f4f6">
+    <button onclick="goTo('screen-paste')" style="color:#111;font-weight:700;font-size:22px;background:none;border:none;cursor:pointer;padding:0;line-height:1">‹</button>
+    <span style="font-weight:800;font-size:20px;color:#111">Preview</span>
+  </div>
+  <div class="scroll-area" style="padding:0 20px 24px">
+    <div style="display:flex;align-items:center;gap:16px;padding:20px 0;border-bottom:.5px solid #f3f4f6">
+      <div style="width:80px;height:80px;border-radius:14px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#bbb" stroke-width="1.5"><rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="#bbb"/></svg>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+        <span style="font-weight:800;color:#111;font-size:clamp(14px,3.5vw,16px)">_antonyjeffin_</span>
+        <span style="font-size:18px">🤍✨</span>
+        <div style="display:flex;align-items:center;gap:16px;color:#6b7280;font-size:13px;font-weight:700;margin-top:2px">
+          <span>🖤 214</span><span>💬 8</span>
+        </div>
+      </div>
+    </div>
+    <p style="color:#9ca3af;font-weight:700;font-size:12px;margin-top:20px;margin-bottom:12px">Winners &amp; Substitutes</p>
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:800;color:#111;font-size:15px">Winners</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="adj-minus" onclick="adjust('winners',-1)">−</button>
+          <span style="font-weight:900;color:#111;width:20px;text-align:center;font-size:16px" id="winners-val">1</span>
+          <button class="adj-plus" onclick="adjust('winners',1)">+</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:800;color:#111;font-size:15px">Substitutes</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="adj-minus" onclick="adjust('subs',-1)">−</button>
+          <span style="font-weight:900;color:#111;width:20px;text-align:center;font-size:16px" id="subs-val">0</span>
+          <button class="adj-plus" onclick="adjust('subs',1)">+</button>
+        </div>
+      </div>
+    </div>
+    <p style="color:#9ca3af;font-weight:700;font-size:12px;margin-top:24px;margin-bottom:12px">Giveaway Settings</p>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <span style="font-weight:800;color:#111;font-size:15px">Countdown</span>
+        <div style="display:flex;align-items:center;gap:12px">
+          <button class="adj-minus" onclick="adjust('countdown',-1)">−</button>
+          <span style="font-weight:900;color:#111;width:20px;text-align:center;font-size:16px" id="countdown-val">3</span>
+          <button class="adj-plus" onclick="adjust('countdown',1)">+</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:800;color:#111;font-size:15px">Record Giveaway</span>
+          <label class="toggle"><input type="checkbox" checked id="toggle-record"><span class="slider"></span></label>
+        </div>
+        <p style="color:#9ca3af;font-size:12px;font-weight:600">Creates the giveaway clip with screen recording.</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <span style="font-weight:800;color:#111;font-size:15px">Count each user once</span>
+          <label class="toggle"><input type="checkbox" checked id="toggle-once"><span class="slider"></span></label>
+        </div>
+        <p style="color:#9ca3af;font-size:12px;font-weight:600">Count users with multiple comments once.</p>
+      </div>
+    </div>
+  </div>
+  <div style="padding:12px 20px;padding-bottom:max(env(safe-area-inset-bottom,0px),24px)">
+    <button class="btn-red" onclick="goToLoading()">NEXT STEP</button>
+  </div>
+</div>
+
+<!-- SCREEN 3 — Loading -->
+<div class="screen bg-grad" id="screen-loading">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:32px;padding:40px 24px">
+    <div style="position:relative;width:min(200px,52vw);height:min(200px,52vw);display:flex;align-items:center;justify-content:center">
+      <svg class="progress-ring" style="position:absolute;width:100%;height:100%" viewBox="0 0 208 208">
+        <circle cx="104" cy="104" r="90" fill="rgba(255,255,255,.15)" stroke="none"/>
+        <circle id="progress-circle" cx="104" cy="104" r="90" fill="none" stroke="white" stroke-width="6" stroke-linecap="round" stroke-dasharray="565.5" stroke-dashoffset="565.5"/>
+      </svg>
+      <span id="progress-text" style="color:white;font-weight:900;font-size:clamp(32px,10vw,48px);position:relative;z-index:1">0%</span>
+    </div>
+    <p id="loading-status" style="color:white;font-weight:800;font-size:clamp(18px,5vw,24px);text-align:center;line-height:1.4">Loading your post<br/>comments...</p>
+  </div>
+  <div style="padding:0 20px;padding-bottom:max(env(safe-area-inset-bottom,0px),32px)">
+    <button id="start-btn" class="btn-red" disabled onclick="goToWinner()">START GIVEAWAY</button>
+  </div>
+</div>
+
+<!-- SCREEN 4 — Choosing Winner -->
+<div class="screen bg-grad" id="screen-winner">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:max(env(safe-area-inset-top,0px),40px) 24px 16px">
+    <h1 style="color:white;font-weight:900;font-size:clamp(26px,7vw,38px);text-align:center;line-height:1.25">Choosing the<br/>1st Winner</h1>
+    <div class="winner-card" style="width:100%;max-width:320px">
+      <div id="shuffle-avatar" style="width:min(112px,28vw);height:min(112px,28vw);border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;overflow:hidden;border:4px solid white;flex-shrink:0">
+        <svg width="60" height="60" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="5" fill="#ccc"/><path d="M2 21c0-5 4-8 10-8s10 3 10 8" fill="#ccc"/></svg>
+      </div>
+      <div id="shuffle-name" style="color:#6b7280;font-weight:800;font-size:clamp(13px,3.5vw,16px);text-align:center;min-height:22px"></div>
+      <div style="background:#ec4899;color:white;font-weight:800;font-size:13px;border-radius:999px;padding:8px 20px;margin-top:4px">1st Winner</div>
+    </div>
+    <div style="background:white;border-radius:16px;display:flex;align-items:center;gap:12px;padding:12px 20px">
+      <div style="width:40px;height:40px;border-radius:12px;background:#ec4899;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🎁</div>
+      <span style="font-weight:800;color:#111;font-size:clamp(12px,3vw,14px)">Comment Picker<br/>for Giveaways</span>
+    </div>
+  </div>
+  <div style="padding:0 20px;padding-bottom:max(env(safe-area-inset-bottom,0px),32px)">
+    <button id="show-winners-btn" class="btn-outline" disabled onclick="goToCompleted()">SHOW ALL WINNERS</button>
+  </div>
+</div>
+
+<!-- SCREEN 5 — Completed -->
+<div class="screen bg-grad" id="screen-completed">
+  <div id="confetti-container" style="position:absolute;inset:0;pointer-events:none;overflow:hidden"></div>
+  <div style="position:relative;z-index:1;padding:max(env(safe-area-inset-top,0px),40px) 20px 16px;display:flex;align-items:center;justify-content:space-between">
+    <p style="color:white;font-weight:900;font-size:clamp(16px,4.5vw,22px)">Giveaway Completed</p>
+    <div style="display:flex;gap:8px">
+      <button class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button class="icon-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </button>
+    </div>
+  </div>
+  <div style="position:relative;z-index:1;padding:0 20px 16px;display:flex;align-items:center;gap:12px">
+    <div style="width:64px;height:64px;border-radius:14px;overflow:hidden;background:rgba(255,255,255,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:28px">🧑</div>
+    <div>
+      <p style="color:white;font-weight:800;font-size:clamp(14px,3.5vw,16px)">_antonyjeffin_</p>
+      <p style="font-size:18px">🤍✨</p>
+    </div>
+  </div>
+  <div style="position:relative;z-index:1;padding:0 20px;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <p style="color:white;font-weight:900;letter-spacing:.15em;font-size:12px;margin-bottom:12px">WINNERS</p>
+    <div class="winner-card pop-anim" style="flex-direction:row;gap:12px;align-items:center;padding:16px;min-height:auto">
+      <div style="width:56px;height:56px;border-radius:50%;background:#e5e7eb;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:24px">👦</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <p style="font-weight:800;color:#111;font-size:clamp(13px,3.5vw,15px)">nan_xdhu4_</p>
+        <span style="background:#ec4899;color:white;font-size:11px;font-weight:800;border-radius:999px;padding:3px 12px;align-self:flex-start">1ST</span>
+      </div>
+    </div>
+  </div>
+  <div style="position:relative;z-index:1;padding:16px 20px;padding-bottom:max(env(safe-area-inset-bottom,0px),32px)">
+    <button class="btn-red" onclick="goTo('screen-paste')">FINISH GIVEAWAY</button>
+  </div>
+</div>
+
+</div><!-- /#app -->
+
+<script>
+/* ══ App State ══ */
+const state = {winners:1, subs:0, countdown:3};
+const FAKE_USERS = [
+  {name:"nan_xdhu4_",      avatar:"https://i.pravatar.cc/150?u=nan"},
+  {name:"rahul_gaming",    avatar:"https://i.pravatar.cc/150?u=rahul"},
+  {name:"priya_sharma",    avatar:"https://i.pravatar.cc/150?u=priya"},
+  {name:"techwithsam",     avatar:"https://i.pravatar.cc/150?u=sam"},
+  {name:"aesthetic_kiara", avatar:"https://i.pravatar.cc/150?u=kiara"},
+  {name:"mr_beastfan",     avatar:"https://i.pravatar.cc/150?u=beast"},
+  {name:"sneha_loves",     avatar:"https://i.pravatar.cc/150?u=sneha"},
+  {name:"vibesonly_07",    avatar:"https://i.pravatar.cc/150?u=vibes"},
+  {name:"_priya.k_",       avatar:"https://i.pravatar.cc/150?u=priya2"},
+  {name:"karthik.raj",     avatar:"https://i.pravatar.cc/150?u=karthik"}
+];
+
+/* ══ Navigation ══ */
+function goTo(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function adjust(field, delta) {
+  const map = {winners:'winners-val', subs:'subs-val', countdown:'countdown-val'};
+  state[field] = Math.max(0, (state[field]||0) + delta);
+  if (field === 'winners') state.winners = Math.max(1, state.winners);
+  document.getElementById(map[field]).textContent = state[field];
+}
+
+/* ══ Loading Screen ══ */
+function goToLoading() {
+  goTo('screen-loading');
+  const circle = document.getElementById('progress-circle');
+  const text   = document.getElementById('progress-text');
+  const status = document.getElementById('loading-status');
+  const btn    = document.getElementById('start-btn');
+  const total  = 565.5;
+  let pct = 0, isPaused = false;
+  btn.disabled = true;
+  circle.style.strokeDashoffset = total;
+  const iv = setInterval(() => {
+    if (isPaused) return;
+    pct += Math.random()*4.5 + 2;
+    const pauses = [50,56,67,87,97];
+    const hit = pauses.find(n => pct >= n && pct < n+4);
+    if (hit) {
+      pct = hit; isPaused = true;
+      const t = hit===50?650 : hit===87?720 : hit===97?950 : 500;
+      setTimeout(() => { isPaused = false; }, t);
+    }
+    if (pct >= 100) {
+      pct = 100; clearInterval(iv);
+      circle.style.strokeDashoffset = 0;
+      text.textContent = '100%';
+      setTimeout(() => {
+        status.textContent = 'Completed!';
+        setTimeout(() => btn.disabled = false, 650);
+      }, 450);
+      return;
+    }
+    circle.style.strokeDashoffset = total * (1 - pct/100);
+    text.textContent = Math.round(pct) + '%';
+  }, 100);
+}
+
+/* ══ Winner Screen ══ */
+function goToWinner() {
+  goTo('screen-winner');
+
+  const nameEl   = document.getElementById('shuffle-name');
+  const avatarEl = document.getElementById('shuffle-avatar');
+  const showBtn  = document.getElementById('show-winners-btn');
+
+  showBtn.disabled = true;
+
+  // FIXED WINNER
+  const winner = {
+    name: "nan_xdhu4_",
+    avatar: "https://i.pravatar.cc/150?u=nan"
+  };
+
+  let index = 0;
+  const totalShuffles = 65;        // Number of fake shuffles
+  const baseDelay = 45;
+
+  function renderUser(user) {
+    nameEl.textContent = user.name;
+
+    avatarEl.style.transition = 'opacity 0.16s ease';
+    avatarEl.style.opacity = '0';
+
+    setTimeout(() => {
+      avatarEl.innerHTML = `
+        <img 
+          src="${user.avatar}" 
+          style="width:100%;height:100%;object-fit:cover" 
+          alt="${user.name}"
+        >
+      `;
+      avatarEl.style.opacity = '1';
+    }, 110);
+  }
+
+  function shuffle(count) {
+    if (count >= totalShuffles) {
+      // Show final winner
+      renderUser(winner);
+
+      // Final pop animation
+      setTimeout(() => {
+        avatarEl.style.transition = 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)';
+        avatarEl.style.transform = 'scale(1.15)';
+        setTimeout(() => {
+          avatarEl.style.transform = 'scale(1)';
+        }, 250);
+      }, 200);
+
+      showBtn.disabled = false;
+      return;
+    }
+
+    const user = FAKE_USERS[index % FAKE_USERS.length];
+    renderUser(user);
+    index++;
+
+    // Progressive slowdown
+    const progress = count / totalShuffles;
+    const delay = baseDelay + Math.pow(progress, 2) * 520;
+
+    setTimeout(() => shuffle(count + 1), delay);
+  }
+
+  // Start
+  shuffle(0);
+}
+
+/* ══ Completed ══ */
+function goToCompleted() {
+  goTo('screen-completed');
+  const container = document.getElementById('confetti-container');
+  container.innerHTML = '';
+  const colors = ['#f0d060','#f06090','#60d0f0','#a060f0','#60f090','#f09060'];
+  for (let i = 0; i < 70; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `left:${Math.random()*100}%;top:${-8+Math.random()*10}px;background:${colors[Math.floor(Math.random()*colors.length)]};animation-delay:${Math.random()*.8}s;animation-duration:${.9+Math.random()*.8}s;transform:rotate(${Math.random()*360}deg);width:${6+Math.random()*6}px;height:${6+Math.random()*6}px;`;
+    container.appendChild(el);
+  }
+}
+
+/* ══════════════════════════════════════
+   PWA — Service Worker Registration
+══════════════════════════════════════ */
+let swRegistration = null;
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', async () => {
+    try {
+      swRegistration = await navigator.serviceWorker.register('./sw.js');
+      console.log('[PWA] SW registered:', swRegistration.scope);
+
+      // Detect update available
+      swRegistration.addEventListener('updatefound', () => {
+        const newWorker = swRegistration.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            showUpdateToast();
+          }
+        });
+      });
+    } catch (err) {
+      console.warn('[PWA] SW registration failed:', err);
+    }
+  });
+}
+
+/* ══ Offline / Online detection ══ */
+function showOfflineToast() {
+  const t = document.getElementById('offline-toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+window.addEventListener('offline', showOfflineToast);
+window.addEventListener('online', () => {
+  const t = document.getElementById('offline-toast');
+  t.textContent = '✅ Back online!';
+  t.classList.add('show');
+  setTimeout(() => { t.classList.remove('show'); t.textContent = '📵 You\'re offline — app still works!'; }, 2500);
+});
+if (!navigator.onLine) showOfflineToast();
+
+/* ══ Update toast ══ */
+function showUpdateToast() {
+  document.getElementById('update-toast').classList.add('show');
+}
+
+/* ══ Install Banner (beforeinstallprompt) ══ */
+let deferredPrompt = null;
+
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  deferredPrompt = e;
+  // Show mini install button inside app after a short delay
+  setTimeout(() => {
+    document.getElementById('mini-install-btn').style.display = 'block';
+  }, 2000);
+  // Auto-show install banner after 8s on first visit
+  if (!localStorage.getItem('installBannerDismissed')) {
+    setTimeout(showBanner, 8000);
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  document.getElementById('install-banner').classList.remove('show');
+  document.getElementById('mini-install-btn').style.display = 'none';
+  deferredPrompt = null;
+  console.log('[PWA] App installed');
+});
+
+function showBanner() {
+  if (!deferredPrompt) return;
+  document.getElementById('install-banner').classList.add('show');
+}
+
+function closeBanner() {
+  document.getElementById('install-banner').classList.remove('show');
+  localStorage.setItem('installBannerDismissed', '1');
+}
+
+document.getElementById('install-btn').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  const { outcome } = await deferredPrompt.userChoice;
+  console.log('[PWA] Install outcome:', outcome);
+  deferredPrompt = null;
+  closeBanner();
+});
+
+/* ══ Splash Screen ══ */
+// window.addEventListener('load', () => {
+//   setTimeout(() => {
+//     const splash = document.getElementById('splash');
+//     splash.classList.add('hide');
+//     setTimeout(() => splash.remove(), 450);
+//   }, 1200);
+// });
+
+// start loading simulation when user clicks "Next Step" on preview screen
+/* ══ Splash Screen Management ══ */
+
+// Show splash on App Open
+window.addEventListener('load', () => {
+    const splash = document.getElementById('splash');
+    
+    // Show splash immediately
+    splash.classList.remove('hide');
+
+    // Auto hide after 1.8 seconds and show first screen
+    setTimeout(() => {
+        splash.classList.add('hide');
+    }, 1800);
+});
+
+// Loading when clicking "NEXT STEP" button (3 seconds)
+function startLoading() {
+    const splash = document.getElementById('splash');
+    const statusText = splash.querySelector('small');
+
+    if (!splash) {
+        console.error("Splash element not found!");
+        goTo('screen-preview');
+        return;
+    }
+
+    // Show splash
+    splash.classList.remove('hide');
+    statusText.textContent = "Analyzing post...";
+
+    // Dynamic loading text
+    setTimeout(() => {
+        statusText.textContent = "Fetching participants...";
+    }, 1300);
+
+    // Keep visible for 3 seconds then go to preview
+    setTimeout(() => {
+        goTo('screen-preview');
+
+        // Hide splash after transition
+        setTimeout(() => {
+            splash.classList.add('hide');
+            // Reset text for next time
+            statusText.textContent = "Loading...";
+        }, 600);
+    }, 3000);
+}
+
+</script>
+</body>
+</html>
